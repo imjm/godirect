@@ -12,6 +12,7 @@ func main() {
 	var (
 		httpAddr = flag.String("http", ":8000", "HTTP service address")
 		url      = flag.String("url", "", "Redirect URL")
+		header   = flag.String("header", "", "Redirect Header key")
 	)
 	flag.Parse()
 
@@ -20,7 +21,8 @@ func main() {
 	}
 
 	h := handler{
-		URL: *url,
+		URL:    *url,
+		Header: *header,
 	}
 
 	serve(*httpAddr, h)
@@ -31,15 +33,28 @@ func serve(addr string, h handler) {
 }
 
 type handler struct {
-	URL string
+	URL    string
+	Header string
 }
 
 func (h *handler) HandleHTTP(ctx *fasthttp.RequestCtx) {
 	fmt.Println(string(ctx.Path()))
-	statusCode, body, err := fasthttp.Get(nil, h.URL+string(ctx.Path()))
-	if err != nil {
-		return
+
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseRequest(req)
+	defer fasthttp.ReleaseResponse(resp)
+
+	req.SetRequestURI(h.URL + string(ctx.Path()))
+
+	if h.Header != "" {
+		req.Header.SetBytesV(h.Header, ctx.Request.Header.Peek(h.Header))
 	}
-	ctx.SetStatusCode(statusCode)
+
+	err := fasthttp.Do(req, resp)
+	if err != nil {
+		fmt.Errorf("err: %s", err.Error())
+	}
+	body := resp.Body()
 	fmt.Fprintf(ctx, string(body))
 }
