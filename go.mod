@@ -1,4 +1,4 @@
-module imjm.github.com/godirect
+module imjma.github.com/godirect
 
 go 1.14
 
